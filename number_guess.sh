@@ -14,7 +14,9 @@ if [[ -z $CHECK_NAME_RESULT ]]
 then
   #New person, say new person text and insert new row
   echo "Welcome, $USERNAME! It looks like this is your first time here."
-  INSERT_NEW_USER_RESULT=$($PSQL "INSERT INTO users(username, games_played, best_game) VALUES('$USERNAME', 0, 999);")
+  GAMES_PLAYED=0
+  BEST_GAME=999
+  INSERT_NEW_USER_RESULT=$($PSQL "INSERT INTO users(username, games_played, best_game) VALUES('$USERNAME', $GAMES_PLAYED, $BEST_GAME);")
 else
   #Existing person, get their info and say existing person text
   GAMES_PLAYED=$($PSQL "SELECT games_played FROM users WHERE username='$USERNAME';")
@@ -25,17 +27,35 @@ fi
 echo "Guess the secret number between 1 and 1000:"
 read GUESS
 
-NUM_GUESSES=1
+GUESS_COUNT=1
 
-until [[ $GUESS = $TARGET ]]
+until [[ $GUESS -eq $TARGET ]]
 do
-  #Give hint, increment guess count, get new guess
-  if [[ $GUESS > $TARGET ]]
+  #Only do main stuff if guess is an integer
+  if [[ $GUESS =~ ^[0-9]+$ ]]
   then
-    echo "It's lower than that, guess again:"
+    #Give hint, increment guess count, get new guess
+    if [[ $GUESS -gt $TARGET ]]
+    then
+      echo "It's lower than that, guess again:"
+    else
+      echo "It's higher than that, guess again:"
+    fi
+    ((GUESS_COUNT=GUESS_COUNT + 1))
+    read GUESS
   else
-    echo "It's higher than that, guess again:"
+    #Ask for integer
+    echo "That is not an integer, guess again:"
+    read GUESS
   fi
-  ((GUESS_COUNT=GUESSCOUNT + 1))
-  read GUESS
 done
+
+#Say final message and update games played and high score
+echo "You guessed it in $GUESS_COUNT tries. The secret number was $TARGET. Nice job!"
+((GAMES_PLAYED++))
+GAME_NUM_UPDATE_RESULT=$($PSQL "UPDATE users SET games_played=$GAMES_PLAYED WHERE username='$USERNAME';")
+#If best game, update best_game
+if [[ $GUESS_COUNT -lt $BEST_GAME ]]
+then
+  BEST_GAME_UPDATE_RESULT=$($PSQL "UPDATE users SET best_game=$GUESS_COUNT WHERE username='$USERNAME';")
+fi
